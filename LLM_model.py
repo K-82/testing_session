@@ -5,12 +5,18 @@ from PIL import Image
 from transformers import MllamaForConditionalGeneration, AutoProcessor
 
 # Initialize model and processor
+from transformers import MllamaForConditionalGeneration
+
 model_id = "meta-llama/Llama-3.2-90B-Vision"
+access_token = "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"  # replace with your token
+
 model = MllamaForConditionalGeneration.from_pretrained(
     model_id,
+    use_auth_token=access_token,
     torch_dtype=torch.bfloat16,
     device_map="auto",
 )
+
 processor = AutoProcessor.from_pretrained(model_id)
 
 # Streamlit app
