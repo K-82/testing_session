@@ -1,77 +1,37 @@
 import streamlit as st
+import requests
 import torch
 from PIL import Image
 from transformers import MllamaForConditionalGeneration, AutoProcessor
-import io
 
-def load_model():
-    """Load the Llama vision model and processor"""
-    try:
-        model_id = "meta-llama/Llama-3.2-11B-Vision"
-        model = MllamaForConditionalGeneration.from_pretrained(
-            model_id,
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-        )
-        processor = AutoProcessor.from_pretrained(model_id)
-        return model, processor
-    except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        return None, None
+# Initialize model and processor
+model_id = "meta-llama/Llama-3.2-90B-Vision"
+model = MllamaForConditionalGeneration.from_pretrained(
+    model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto",
+)
+processor = AutoProcessor.from_pretrained(model_id)
 
-def extract_text(image, model, processor):
-    """Extract text from the image using Llama vision model"""
-    try:
-        # Prepare the prompt for text extraction only
-        prompt = "<|image|><|begin_of_text|>Extract and list all text visible in this image:"
-        
-        # Process the image
-        inputs = processor(image, prompt, return_tensors="pt").to(model.device)
-        
-        # Generate output
-        output = model.generate(**inputs, max_new_tokens=100)
-        
-        # Decode and return the result
-        return processor.decode(output[0])
-    except Exception as e:
-        st.error(f"Error processing image: {str(e)}")
-        return None
+# Streamlit app
+st.title("Simple OCR App")
+st.write("Upload an image, and the app will extract text present in the image.")
 
-def main():
-    st.title("Image Text Extraction")
-    st.write("Upload an image to extract text using Llama Vision model")
+# Image upload
+uploaded_image = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-    # Initialize session state for model and processor
-    if 'model' not in st.session_state or 'processor' not in st.session_state:
-        with st.spinner("Loading Llama Vision model..."):
-            model, processor = load_model()
-            if model and processor:
-                st.session_state['model'] = model
-                st.session_state['processor'] = processor
-            else:
-                st.error("Failed to load model. Please try again.")
-                return
+if uploaded_image:
+    image = Image.open(uploaded_image)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # File uploader
-    uploaded_file = st.file_uploader("Choose an image file", type=['png', 'jpg', 'jpeg'])
+    # Use OCR prompt
+    prompt = "<|image|><|begin_of_text|>Extract text visible on the image: "
+    inputs = processor(image, prompt, return_tensors="pt").to(model.device)
 
-    if uploaded_file is not None:
-        # Display the uploaded image
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+    # Generate output without adding extra information
+    output = model.generate(**inputs, max_new_tokens=30)
+    extracted_text = processor.decode(output[0]).strip()
 
-        # Add extract button
-        if st.button("Extract Text"):
-            with st.spinner("Extracting text..."):
-                extracted_text = extract_text(
-                    image, 
-                    st.session_state['model'], 
-                    st.session_state['processor']
-                )
-                
-                if extracted_text:
-                    st.subheader("Extracted Text:")
-                    st.write(extracted_text)
-
-if __name__ == "__main__":
-    main()
+    # Display the extracted text
+    st.write("**Extracted Text:**")
+    st.write(extracted_text)
